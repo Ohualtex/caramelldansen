@@ -34,9 +34,7 @@ ENV/
 *.swo
 
 # Media assets & binary cache
+assets/
 *.bin
 *.mp4
 *.mp3
-assets/*.bin
-assets/*.mp4
-assets/*.mp3

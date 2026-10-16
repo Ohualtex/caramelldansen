@@ -5,8 +5,6 @@
 
 High-performance, flicker-free, 24-bit TrueColor **Caramelldansen** terminal player featuring **Dansen Loop** mode!
 
-Inspired by [Ohualtex/bad-apple](https://github.com/Ohualtex/bad-apple).
-
 ---
 
 ## Features
@@ -31,7 +29,7 @@ Inspired by [Ohualtex/bad-apple](https://github.com/Ohualtex/bad-apple).
 ## Controls
 
 | Key | Action |
-|:---|:---|
+| :--- | :--- |
 | **Space** | Pause / Resume |
 | **M** | Cycle Render Mode (`halfblock` → `color-ascii` → `braille` → `ascii`) |
 | **C** | Toggle Color Mode (TrueColor RGB ↔ Monochrome) |
@@ -47,8 +45,8 @@ Inspired by [Ohualtex/bad-apple](https://github.com/Ohualtex/bad-apple).
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/caramell-dansen.git
-cd caramell-dansen
+git clone https://github.com/Ohualtex/caramelldansen.git
+cd caramelldansen
 
 # Run with virtual environment
 python3 -m venv .venv

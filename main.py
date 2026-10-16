@@ -19,6 +19,9 @@ from input import get_input_handler
 from renderer import TerminalRenderer
 from ui import render_status_bar
 
+DEFAULT_VIDEO_NAME = "caramell_dansen.mp4"
+DEFAULT_AUDIO_NAME = "caramell_dansen.mp3"
+DEFAULT_CACHE_NAME = "caramell_dansen.bin"
 DEFAULT_VIDEO_PATH = "assets/caramell_dansen.mp4"
 DEFAULT_AUDIO_PATH = "assets/caramell_dansen.mp3"
 DEFAULT_CACHE_PATH = "assets/caramell_dansen.bin"
@@ -55,21 +58,32 @@ class CaramellPlayer:
 
     def setup(self) -> None:
         """Initializes cache, audio, renderer, and terminal buffers."""
-        # 1. Ensure binary cache exists
+        from download import ensure_playback_assets, get_asset_path
+
+        # Resolve asset paths
+        self.cache_path = get_asset_path(DEFAULT_CACHE_NAME)
+        self.audio_path = get_asset_path(DEFAULT_AUDIO_NAME)
+        video_path = get_asset_path(DEFAULT_VIDEO_NAME)
+
+        # 1. Ensure binary cache or source video exists
         if not os.path.exists(self.cache_path):
-            if not os.path.exists(DEFAULT_VIDEO_PATH):
-                raise RuntimeError(
-                    f"Neither cache '{self.cache_path}' nor source video '{DEFAULT_VIDEO_PATH}' was found."
+            print("[*] Assets missing locally, checking provisioning...")
+            ensure_playback_assets()
+
+            if not os.path.exists(self.cache_path):
+                if not os.path.exists(video_path):
+                    raise RuntimeError(
+                        f"Neither cache '{self.cache_path}' nor source video '{video_path}' was found."
+                    )
+                print(f"[*] Building CDBP binary cache from '{video_path}'...")
+                BinaryCacheBuilder.build_cache(
+                    video_path,
+                    self.cache_path,
+                    target_width=160,
+                    target_height=90,
+                    fps=25.0,
                 )
-            print(f"[*] Building CDBP binary cache from '{DEFAULT_VIDEO_PATH}'...")
-            BinaryCacheBuilder.build_cache(
-                DEFAULT_VIDEO_PATH,
-                self.cache_path,
-                target_width=160,
-                target_height=90,
-                fps=25.0,
-            )
-            print("[+] Cache generation complete.")
+                print("[+] Cache generation complete.")
 
         self.cache = BinaryCacheReader(self.cache_path)
 
