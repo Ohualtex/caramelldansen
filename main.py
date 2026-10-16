@@ -22,9 +22,6 @@ from ui import render_status_bar
 DEFAULT_VIDEO_NAME = "caramell_dansen.mp4"
 DEFAULT_AUDIO_NAME = "caramell_dansen.mp3"
 DEFAULT_CACHE_NAME = "caramell_dansen.bin"
-DEFAULT_VIDEO_PATH = "assets/caramell_dansen.mp4"
-DEFAULT_AUDIO_PATH = "assets/caramell_dansen.mp3"
-DEFAULT_CACHE_PATH = "assets/caramell_dansen.bin"
 
 
 class CaramellPlayer:
@@ -36,8 +33,8 @@ class CaramellPlayer:
         color: bool = True,
         loop: bool = True,
         no_audio: bool = False,
-        cache_path: str = DEFAULT_CACHE_PATH,
-        audio_path: str = DEFAULT_AUDIO_PATH,
+        cache_path: str | None = None,
+        audio_path: str | None = None,
     ):
         self.mode = mode
         self.color = color
@@ -61,8 +58,10 @@ class CaramellPlayer:
         from download import ensure_playback_assets, get_asset_path
 
         # Resolve asset paths
-        self.cache_path = get_asset_path(DEFAULT_CACHE_NAME)
-        self.audio_path = get_asset_path(DEFAULT_AUDIO_NAME)
+        if not self.cache_path:
+            self.cache_path = get_asset_path(DEFAULT_CACHE_NAME)
+        if not self.audio_path:
+            self.audio_path = get_asset_path(DEFAULT_AUDIO_NAME)
         video_path = get_asset_path(DEFAULT_VIDEO_NAME)
 
         # 1. Ensure binary cache or source video exists
@@ -308,10 +307,14 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.build_cache:
+        from download import get_asset_path
+
         print("[*] Rebuilding CDBP binary cache...")
+        video_src = get_asset_path(DEFAULT_VIDEO_NAME)
+        cache_dest = get_asset_path(DEFAULT_CACHE_NAME)
         BinaryCacheBuilder.build_cache(
-            DEFAULT_VIDEO_PATH,
-            DEFAULT_CACHE_PATH,
+            video_src,
+            cache_dest,
             target_width=160,
             target_height=90,
             fps=25.0,

@@ -17,6 +17,21 @@ DEFAULT_VIDEO_NAME = "caramell_dansen.mp4"
 DEFAULT_AUDIO_NAME = "caramell_dansen.mp3"
 DEFAULT_CACHE_NAME = "caramell_dansen.bin"
 
+ASSET_MD5_CHECKSUMS = {
+    "caramell_dansen.bin": "8433fce43d9f43b77d7cb67ed7f750e5",
+    "caramell_dansen.mp3": "bdc346654f84cfe98bba911bf1561851",
+    "caramell_dansen.mp4": "2f2750018417b71a3361f841a79918ce",
+}
+
+
+def compute_md5(filepath: str) -> str:
+    """Calculates MD5 hash of a local file in chunks."""
+    hasher = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest().lower()
+
 
 def get_media_cache_dir() -> str:
     """Returns platform standard persistent cache directory."""
@@ -41,19 +56,19 @@ def get_asset_path(filename: str) -> str:
     3. Check persistent platform cache directory.
     """
     assets_dir_path = os.path.join("assets", filename)
-    if os.path.exists(assets_dir_path):
+    if os.path.isfile(assets_dir_path) and os.path.getsize(assets_dir_path) > 0:
         return assets_dir_path
 
-    if os.path.exists(filename):
+    if os.path.isfile(filename) and os.path.getsize(filename) > 0:
         return filename
 
     return os.path.join(get_media_cache_dir(), filename)
 
 
 def download_asset(filename: str, label: str = "") -> str:
-    """Downloads an asset from GitHub Releases if missing."""
+    """Downloads an asset from GitHub Releases and validates its integrity."""
     dest_path = get_asset_path(filename)
-    if os.path.exists(dest_path):
+    if os.path.isfile(dest_path) and os.path.getsize(dest_path) > 0:
         return dest_path
 
     # Ensure parent dir exists
@@ -75,14 +90,28 @@ def download_asset(filename: str, label: str = "") -> str:
             sys.stdout.write(f"\r    {mb:6.1f}MB downloaded")
         sys.stdout.flush()
 
+    temp_dest = dest_path + ".tmp"
     try:
-        temp_dest = dest_path + ".tmp"
         urllib.request.urlretrieve(url, temp_dest, reporthook=progress)
         print()
+
+        expected_md5 = ASSET_MD5_CHECKSUMS.get(filename)
+        if expected_md5:
+            actual_md5 = compute_md5(temp_dest)
+            if actual_md5 != expected_md5.lower():
+                raise ValueError(
+                    f"Checksum mismatch for {filename}: expected {expected_md5}, got {actual_md5}"
+                )
+
         os.rename(temp_dest, dest_path)
         print(f"[+] Successfully provisioned {filename}")
         return dest_path
     except Exception as e:
+        if os.path.exists(temp_dest):
+            try:
+                os.remove(temp_dest)
+            except OSError:
+                pass
         print(f"\n[!] Failed to download {filename}: {e}")
         raise
 
