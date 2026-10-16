@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caramell-dansen"
+version = "1.0.0"
+authors = [
+    { name = "Miyamura" }
+]
+description = "Caramell Dansen Terminal Player — High Performance TrueColor & Unicode with Dansen Loop"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = ["caramelldansen", "terminal", "ascii-art", "truecolor", "braille", "cli"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Video :: Display",
+]
+dependencies = [
+    "numpy>=1.20",
+]
+
+[project.scripts]
+caramell-dansen = "main:main"
+caramelldansen = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "renderer", "cache", "ui", "download"]
+packages = ["audio", "input"]
