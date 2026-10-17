@@ -72,11 +72,11 @@ cd caramelldansen
 # Install dependencies
 pip install -r requirements.txt
 
-# Start playback (starts directly in Dansen Loop mode)
+# Start playback (plays full music video from 00:00)
 python main.py
 
-# Play full music video from start
-python main.py --full
+# Start directly in infinite Dansen Loop mode
+python main.py --loop
 
 # Select rendering mode
 python main.py --mode color-ascii
@@ -94,8 +94,8 @@ options:
   --mode {halfblock,color-ascii,braille,ascii}
                         Rendering mode (default: halfblock)
   --no-color, --mono    Disable TrueColor rendering and run in monochrome
-  --loop                Start in infinite Dansen Loop mode (default: True)
-  --full                Play full music video from start to finish
+  --loop                Start in infinite Dansen Loop mode
+  --full                Play full music video from start to finish (default)
   --no-audio            Mute audio and run on internal clock
   --build-cache         Force rebuild CDBP binary cache
 ```

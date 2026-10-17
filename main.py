@@ -25,7 +25,7 @@ class CaramellPlayer:
         self,
         mode: str = "halfblock",
         color: bool = True,
-        loop: bool = True,
+        loop: bool = False,
         no_audio: bool = False,
         cache_path: str | None = None,
         audio_path: str | None = None,
@@ -243,14 +243,14 @@ def main() -> None:
         "--loop",
         dest="loop",
         action="store_true",
-        default=True,
+        default=False,
         help="Start in infinite Dansen Loop mode",
     )
     parser.add_argument(
         "--full",
         dest="loop",
         action="store_false",
-        help="Play full music video from start to finish",
+        help="Play full music video from start to finish (default)",
     )
     parser.add_argument(
         "--no-audio",
