@@ -2,26 +2,20 @@
 """
 Caramell Dansen Terminal Player
 High-performance, TrueColor and Unicode terminal player with Dansen Loop mode.
+Built with Platform Abstraction Layer (PAL) and Audio Master Clock architecture.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
-import signal
 import sys
 import time
-import shutil
 
-from audio import get_audio_player, DummyAudioPlayer
-from cache import BinaryCacheReader, BinaryCacheBuilder, BinaryCacheError
-from input import get_input_handler
-from renderer import TerminalRenderer, get_terminal_size
+from cache import BinaryCacheReader, BinaryCacheBuilder
+from download import ensure_assets, DEFAULT_CACHE_NAME, DEFAULT_AUDIO_NAME, DEFAULT_VIDEO_NAME, get_asset_path
+from platforms import get_platform, BasePlatform
+from renderer import TerminalRenderer
 from ui import render_status_bar
-
-DEFAULT_VIDEO_NAME = "caramell_dansen.mp4"
-DEFAULT_AUDIO_NAME = "caramell_dansen.mp3"
-DEFAULT_CACHE_NAME = "caramell_dansen.bin"
 
 
 class CaramellPlayer:
@@ -43,142 +37,95 @@ class CaramellPlayer:
         self.cache_path = cache_path
         self.audio_path = audio_path
 
-        self.running = False
-        self.is_paused = False
-        self._terminal_resized = False
-        self._last_terminal_size: tuple[int, int] | None = None
+        self.running: bool = False
+        self.is_paused: bool = False
 
         # Components
         self.cache: BinaryCacheReader | None = None
-        self.audio = None
+        self.platform: BasePlatform | None = None
         self.renderer: TerminalRenderer | None = None
-        self.input_handler = None
 
     def setup(self) -> None:
-        """Initializes cache, audio, renderer, and terminal buffers."""
-        from download import ensure_playback_assets, get_asset_path
-
-        # Resolve asset paths
-        if not self.cache_path:
-            self.cache_path = get_asset_path(DEFAULT_CACHE_NAME)
-        if not self.audio_path:
-            self.audio_path = get_asset_path(DEFAULT_AUDIO_NAME)
-        video_path = get_asset_path(DEFAULT_VIDEO_NAME)
-
-        # 1. Ensure binary cache or source video exists
-        if not os.path.exists(self.cache_path):
-            print("[*] Assets missing locally, checking provisioning...")
-            ensure_playback_assets()
-
-            if not os.path.exists(self.cache_path):
-                if not os.path.exists(video_path):
-                    raise RuntimeError(
-                        f"Neither cache '{self.cache_path}' nor source video '{video_path}' was found."
-                    )
-                print(f"[*] Building CDBP binary cache from '{video_path}'...")
-                BinaryCacheBuilder.build_cache(
-                    video_path,
-                    self.cache_path,
-                    target_width=160,
-                    target_height=90,
-                    fps=25.0,
-                )
-                print("[+] Cache generation complete.")
+        """Initializes assets, cache reader, audio, renderer, and terminal buffers."""
+        # 1. Resolve and ensure assets (automatically downloads on first run if missing)
+        cache_file, audio_file = ensure_assets(self.cache_path, self.audio_path)
+        self.cache_path = cache_file
+        self.audio_path = audio_file
 
         self.cache = BinaryCacheReader(self.cache_path)
 
-        # 2. Setup Audio
-        if self.no_audio or not os.path.exists(self.audio_path):
-            self.audio = DummyAudioPlayer(self.audio_path)
-        else:
-            self.audio = get_audio_player(self.audio_path)
+        # 2. Instantiate isolated OS platform subsystem (Audio, Input, Terminal)
+        self.platform = get_platform(audio_path=self.audio_path, no_audio=self.no_audio)
 
-        # 3. Setup Renderer & Input
+        # 3. Setup Video Renderer
         self.renderer = TerminalRenderer(
             mode=self.mode,
             aspect_ratio=16.0 / 9.0,
             color=self.color,
         )
-        self.input_handler = get_input_handler()
-
-        # 4. Handle window resize signal
-        def on_sigwinch(signum, frame):
-            self._terminal_resized = True
-
-        if hasattr(signal, "SIGWINCH"):
-            signal.signal(signal.SIGWINCH, on_sigwinch)
-
-    def _enter_fullscreen(self) -> None:
-        """Enters alternate screen buffer and hides cursor."""
-        sys.stdout.write("\033[?1049h\033[?25l\033[2J\033[H")
-        sys.stdout.flush()
-
-    def _exit_fullscreen(self) -> None:
-        """Restores main screen buffer and unhides cursor."""
-        sys.stdout.write("\033[0m\033[?25h\033[?1049l")
-        sys.stdout.flush()
 
     def run(self) -> None:
-        """Main player execution loop."""
+        """Main player execution loop driven by Audio Master Clock."""
         self.setup()
-        self._enter_fullscreen()
-        self.running = True
-        self._last_terminal_size = get_terminal_size()
+        if not self.platform or not self.cache or not self.renderer:
+            return
 
-        # If starting directly in loop mode, seek to chorus start
-        if self.loop and self.cache:
-            self.audio.seek(self.cache.loop_start_sec)
+        self.platform.terminal.enter_fullscreen()
+        self.running = True
+
+        # If starting directly in Dansen Loop mode, seek audio to chorus start
+        if self.loop:
+            self.platform.audio.start()
+            self.platform.audio.seek(self.cache.loop_start_sec)
         else:
-            self.audio.start()
+            self.platform.audio.start()
 
         fps_timer = time.perf_counter()
         frame_counter = 0
-        measured_fps = self.cache.fps if self.cache else 25.0
+        measured_fps = self.cache.fps
 
         try:
             while self.running:
                 loop_start_time = time.perf_counter()
 
-                # 1. Process keyboard inputs
-                key = self.input_handler.poll_key()
+                # 1. Process non-blocking keyboard inputs
+                key = self.platform.input.poll_key()
                 if key:
                     self._handle_key(key)
 
                 if not self.running:
                     break
 
-                # 2. Check for terminal window resize
-                current_size = get_terminal_size()
-                if self._terminal_resized or current_size != self._last_terminal_size:
-                    self._terminal_resized = False
-                    self._last_terminal_size = current_size
-                    # Wipe screen buffer completely to remove stale character artifacts
-                    sys.stdout.write("\033[2J\033[H")
-                    sys.stdout.flush()
+                # 2. Check responsive window resizing
+                self.platform.terminal.check_resized()
 
-                cols, lines = current_size
+                # 3. Audio Master Clock: Timing and Dansen Loop boundary checks
+                current_time = self.platform.audio.get_pos()
 
-                # 3. Timing and Loop boundary checks
-                current_time = self.audio.get_pos()
-
-                if self.loop and self.cache:
+                if self.loop:
                     if current_time >= self.cache.loop_end_sec:
-                        self.audio.seek(self.cache.loop_start_sec)
+                        self.platform.audio.seek(self.cache.loop_start_sec)
+                        current_time = self.cache.loop_start_sec
+                    elif current_time < self.cache.loop_start_sec:
+                        self.platform.audio.seek(self.cache.loop_start_sec)
                         current_time = self.cache.loop_start_sec
                 elif current_time >= self.cache.duration:
-                    # Video completed in normal mode
+                    # Video playback finished in full video mode
                     self.running = False
                     break
 
-                # 4. Retrieve frame
+                # 4. Fetch synchronized video frame
                 frame_rgb, frame_idx = self.cache.get_frame_for_time(current_time)
 
-                # 5. Render video frame
+                # 5. Get terminal dimensions and render video frame
+                cols, lines = self.platform.terminal.get_size()
                 rendered_frame = self.renderer.render(
-                    frame_rgb, terminal_cols=cols, terminal_lines=lines
+                    frame_rgb,
+                    terminal_cols=cols,
+                    terminal_lines=lines,
                 )
 
-                # 6. Render HUD status bar
+                # 6. Render adaptive HUD status bar
                 hud_line = render_status_bar(
                     current_time=current_time,
                     duration=self.cache.duration,
@@ -190,12 +137,12 @@ class CaramellPlayer:
                     terminal_columns=cols,
                 )
 
-                # 7. Flush output to terminal using home cursor, line clear, and bottom clear
+                # 7. Atomic frame flush using home cursor, line clear, and bottom clear
                 buffer = "\033[H" + rendered_frame + "\n" + hud_line + "\033[K\033[J"
                 sys.stdout.write(buffer)
                 sys.stdout.flush()
 
-                # FPS calculation
+                # Measure actual rendering FPS
                 frame_counter += 1
                 now = time.perf_counter()
                 if now - fps_timer >= 1.0:
@@ -203,7 +150,7 @@ class CaramellPlayer:
                     frame_counter = 0
                     fps_timer = now
 
-                # Pace loop to target FPS (approx 25-30 FPS)
+                # Pace loop to target frame rate (~25 FPS)
                 target_frame_time = 1.0 / self.cache.fps
                 elapsed = time.perf_counter() - loop_start_time
                 sleep_dur = target_frame_time - elapsed
@@ -215,69 +162,65 @@ class CaramellPlayer:
 
     def _handle_key(self, key: str) -> None:
         """Processes interactive user keypress."""
-        if key in ("Q", "ESC"):
+        if not self.platform or not self.cache or not self.renderer:
+            return
+
+        if key in ("QUIT", "Q", "ESC"):
             self.running = False
 
         elif key == "SPACE":
             if self.is_paused:
-                self.audio.resume()
+                self.platform.audio.resume()
                 self.is_paused = False
             else:
-                self.audio.pause()
+                self.platform.audio.pause()
                 self.is_paused = True
 
-        elif key == "M":
+        elif key == "MODE":
             new_mode = self.renderer.cycle_mode()
             self.mode = new_mode
 
-        elif key == "C":
+        elif key == "COLOR":
             self.color = not self.color
             self.renderer.color = self.color
 
-        elif key == "L":
+        elif key == "LOOP":
             self.loop = not self.loop
-            if self.loop and self.cache:
-                curr = self.audio.get_pos()
+            if self.loop:
+                curr = self.platform.audio.get_pos()
                 if curr < self.cache.loop_start_sec or curr >= self.cache.loop_end_sec:
-                    self.audio.seek(self.cache.loop_start_sec)
+                    self.platform.audio.seek(self.cache.loop_start_sec)
 
         elif key == "RIGHT":
-            new_pos = min(self.cache.duration, self.audio.get_pos() + 5.0)
-            self.audio.seek(new_pos)
+            new_pos = min(self.cache.duration, self.platform.audio.get_pos() + 5.0)
+            self.platform.audio.seek(new_pos)
 
         elif key == "LEFT":
-            new_pos = max(0.0, self.audio.get_pos() - 5.0)
-            self.audio.seek(new_pos)
+            new_pos = max(0.0, self.platform.audio.get_pos() - 5.0)
+            self.platform.audio.seek(new_pos)
 
-        elif key == "R":
+        elif key == "RESTART":
             target = self.cache.loop_start_sec if self.loop else 0.0
-            self.audio.seek(target)
+            self.platform.audio.seek(target)
 
     def cleanup(self) -> None:
         """Restores all system and terminal state."""
-        if self.audio:
-            try:
-                self.audio.stop()
-            except Exception:
-                pass
-
-        if self.input_handler:
-            try:
-                self.input_handler.cleanup()
-            except Exception:
-                pass
-
         if self.cache:
             try:
                 self.cache.close()
             except Exception:
                 pass
 
-        self._exit_fullscreen()
+        if self.platform:
+            try:
+                self.platform.cleanup()
+            except Exception:
+                pass
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
+        prog="caramelldansen",
         description="Caramell Dansen Terminal Player — High Performance TrueColor & Unicode",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -321,8 +264,6 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.build_cache:
-        from download import get_asset_path
-
         print("[*] Rebuilding CDBP binary cache...")
         video_src = get_asset_path(DEFAULT_VIDEO_NAME)
         cache_dest = get_asset_path(DEFAULT_CACHE_NAME)
