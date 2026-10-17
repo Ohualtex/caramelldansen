@@ -5,7 +5,9 @@ Supports TrueColor (24-bit) halfblock, color-ASCII, Braille 2x4 matrix, and clas
 
 from __future__ import annotations
 
+import os
 import shutil
+import sys
 from typing import Optional, Tuple
 import numpy as np
 
@@ -17,6 +19,37 @@ ASCII_CHARS = np.array(list(" .:-=+*#%@"), dtype="<U1")
 # (0,0)=0x01, (1,0)=0x02, (2,0)=0x04, (3,0)=0x40
 # (0,1)=0x08, (1,1)=0x10, (2,1)=0x20, (3,1)=0x80
 BRAILLE_BASE = 0x2800
+
+
+def get_terminal_size(fallback: Tuple[int, int] = (80, 24)) -> Tuple[int, int]:
+    """
+    Returns real-time terminal dimensions (columns, lines).
+    Bypasses static os.environ['COLUMNS'] / ['LINES'] caches by querying
+    file descriptors directly via kernel ioctl.
+    """
+    import sys
+    for stream in (sys.stdout, sys.stdin, sys.stderr):
+        try:
+            if hasattr(stream, "fileno"):
+                size = os.get_terminal_size(stream.fileno())
+                if size.columns > 0 and size.lines > 0:
+                    return size.columns, size.lines
+        except (AttributeError, ValueError, OSError):
+            continue
+
+    try:
+        fd = os.open("/dev/tty", os.O_RDONLY)
+        try:
+            size = os.get_terminal_size(fd)
+            if size.columns > 0 and size.lines > 0:
+                return size.columns, size.lines
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
+
+    cols, lines = shutil.get_terminal_size(fallback=fallback)
+    return max(4, cols), max(2, lines)
 
 
 class TerminalRenderer:
@@ -58,14 +91,22 @@ class TerminalRenderer:
         self.set_mode(self.MODES[idx])
         return self.mode
 
-    def get_dimensions(self) -> Tuple[int, int, int, int, int, int]:
+    def get_dimensions(
+        self,
+        terminal_cols: Optional[int] = None,
+        terminal_lines: Optional[int] = None,
+    ) -> Tuple[int, int, int, int, int, int]:
         """
         Calculates character width, height, required pixel width/height,
         and margin paddings to preserve video aspect ratio centered in terminal.
 
         Returns: (char_w, char_h, pix_w, pix_h, pad_left, pad_top)
         """
-        cols, lines = shutil.get_terminal_size(fallback=(80, 24))
+        if terminal_cols is None or terminal_lines is None:
+            cols, lines = get_terminal_size(fallback=(80, 24))
+        else:
+            cols, lines = max(4, terminal_cols), max(2, terminal_lines)
+
         # Reserve lines for bottom HUD/status bar and safety margins
         avail_w = max(4, self.target_width if self.target_width is not None else (cols - 2))
         avail_h = max(2, self.target_height if self.target_height is not None else (lines - 3))
@@ -145,16 +186,23 @@ class TerminalRenderer:
 
         return frame_rgb[self._y_indices[:, None], self._x_indices]
 
-    def render(self, frame_rgb: np.ndarray) -> str:
+    def render(
+        self,
+        frame_rgb: np.ndarray,
+        terminal_cols: Optional[int] = None,
+        terminal_lines: Optional[int] = None,
+    ) -> str:
         """
         Converts an RGB numpy array (H, W, 3) into an ANSI formatted string
         centered and ready for terminal output.
         """
-        char_w, char_h, pix_w, pix_h, pad_left, pad_top = self.get_dimensions()
+        char_w, char_h, pix_w, pix_h, pad_left, pad_top = self.get_dimensions(
+            terminal_cols, terminal_lines
+        )
         scaled = self.resize_frame(frame_rgb, pix_w, pix_h)
 
         left_margin = " " * pad_left
-        lines: list[str] = ["\n" * pad_top] if pad_top > 0 else []
+        lines: list[str] = ["\033[K\n" * pad_top] if pad_top > 0 else []
 
         if self.mode == "halfblock":
             lines.extend(self._render_halfblock(scaled, char_w, char_h, left_margin))
@@ -188,7 +236,7 @@ class TerminalRenderer:
             for row in chars:
                 output.append(margin)
                 output.append("".join(row))
-                output.append("\n")
+                output.append("\033[K\n")
             return output
 
         # TrueColor Halfblock with ANSI run-length compression
@@ -214,7 +262,7 @@ class TerminalRenderer:
 
                 output.append("▀")
 
-            output.append("\033[0m\n")
+            output.append("\033[0m\033[K\n")
 
         return output
 
@@ -239,7 +287,7 @@ class TerminalRenderer:
                     last_fg = (r, g, b)
                 output.append(row_chars[x])
 
-            output.append("\033[0m\n")
+            output.append("\033[0m\033[K\n")
 
         return output
 
@@ -255,7 +303,7 @@ class TerminalRenderer:
         for row in chars:
             output.append(margin)
             output.append("".join(row))
-            output.append("\n")
+            output.append("\033[K\n")
         return output
 
     def _render_braille(
@@ -306,6 +354,6 @@ class TerminalRenderer:
 
             if self.color:
                 output.append("\033[0m")
-            output.append("\n")
+            output.append("\033[K\n")
 
         return output

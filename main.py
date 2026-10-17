@@ -16,7 +16,7 @@ import shutil
 from audio import get_audio_player, DummyAudioPlayer
 from cache import BinaryCacheReader, BinaryCacheBuilder, BinaryCacheError
 from input import get_input_handler
-from renderer import TerminalRenderer
+from renderer import TerminalRenderer, get_terminal_size
 from ui import render_status_bar
 
 DEFAULT_VIDEO_NAME = "caramell_dansen.mp4"
@@ -46,6 +46,7 @@ class CaramellPlayer:
         self.running = False
         self.is_paused = False
         self._terminal_resized = False
+        self._last_terminal_size: tuple[int, int] | None = None
 
         # Components
         self.cache: BinaryCacheReader | None = None
@@ -122,6 +123,7 @@ class CaramellPlayer:
         self.setup()
         self._enter_fullscreen()
         self.running = True
+        self._last_terminal_size = get_terminal_size()
 
         # If starting directly in loop mode, seek to chorus start
         if self.loop and self.cache:
@@ -145,7 +147,18 @@ class CaramellPlayer:
                 if not self.running:
                     break
 
-                # 2. Timing and Loop boundary checks
+                # 2. Check for terminal window resize
+                current_size = get_terminal_size()
+                if self._terminal_resized or current_size != self._last_terminal_size:
+                    self._terminal_resized = False
+                    self._last_terminal_size = current_size
+                    # Wipe screen buffer completely to remove stale character artifacts
+                    sys.stdout.write("\033[2J\033[H")
+                    sys.stdout.flush()
+
+                cols, lines = current_size
+
+                # 3. Timing and Loop boundary checks
                 current_time = self.audio.get_pos()
 
                 if self.loop and self.cache:
@@ -157,14 +170,15 @@ class CaramellPlayer:
                     self.running = False
                     break
 
-                # 3. Retrieve frame
+                # 4. Retrieve frame
                 frame_rgb, frame_idx = self.cache.get_frame_for_time(current_time)
 
-                # 4. Render video frame
-                rendered_frame = self.renderer.render(frame_rgb)
+                # 5. Render video frame
+                rendered_frame = self.renderer.render(
+                    frame_rgb, terminal_cols=cols, terminal_lines=lines
+                )
 
-                # 5. Render HUD status bar
-                cols, _ = shutil.get_terminal_size(fallback=(80, 24))
+                # 6. Render HUD status bar
                 hud_line = render_status_bar(
                     current_time=current_time,
                     duration=self.cache.duration,
@@ -176,8 +190,8 @@ class CaramellPlayer:
                     terminal_columns=cols,
                 )
 
-                # 6. Flush output to terminal using home cursor
-                buffer = "\033[H" + rendered_frame + "\n" + hud_line
+                # 7. Flush output to terminal using home cursor, line clear, and bottom clear
+                buffer = "\033[H" + rendered_frame + "\n" + hud_line + "\033[K\033[J"
                 sys.stdout.write(buffer)
                 sys.stdout.flush()
 

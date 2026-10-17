@@ -50,21 +50,32 @@ def render_status_bar(
     """
     Renders an adaptive, centered status HUD bar.
     Displays playback state, scrubber, loop mode, render mode, and FPS.
+    Gracefully condenses layout on narrow terminals to prevent line wrapping.
     """
     time_str = f"{format_time(current_time)} / {format_time(duration)}"
-    progress_bar = create_progress_bar(current_time, duration, bar_length=16)
-
     status_badge = "\033[93m⏸ PAUSED\033[0m" if is_paused else "\033[92m▶ PLAY\033[0m"
-    loop_badge = "\033[95m[LOOP ON]\033[0m" if loop_active else "\033[90m[LOOP OFF]\033[0m"
-    color_badge = "\033[96m[RGB]\033[0m" if color else "\033[90m[MONO]\033[0m"
-    mode_badge = f"\033[97m{mode}\033[0m"
     fps_badge = f"\033[90m{fps:.1f} fps\033[0m"
 
-    hud = (
-        f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  "
-        f"│  {mode_badge}  {color_badge}  {loop_badge}  │  {fps_badge} "
-    )
+    if terminal_columns < 45:
+        # Ultra-compact HUD for very small windows
+        hud = f" {status_badge}  \033[97m{time_str}\033[0m "
+    elif terminal_columns < 75:
+        # Compact HUD with small scrubber
+        bar_len = max(6, min(10, terminal_columns - 46))
+        progress_bar = create_progress_bar(current_time, duration, bar_length=bar_len)
+        color_badge = "\033[96m[RGB]\033[0m" if color else "\033[90m[MONO]\033[0m"
+        hud = f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  │  {color_badge} "
+    else:
+        # Full rich HUD
+        progress_bar = create_progress_bar(current_time, duration, bar_length=16)
+        loop_badge = "\033[95m[LOOP ON]\033[0m" if loop_active else "\033[90m[LOOP OFF]\033[0m"
+        color_badge = "\033[96m[RGB]\033[0m" if color else "\033[90m[MONO]\033[0m"
+        mode_badge = f"\033[97m{mode}\033[0m"
+        hud = (
+            f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  "
+            f"│  {mode_badge}  {color_badge}  {loop_badge}  │  {fps_badge} "
+        )
 
     vis_len = len(strip_ansi(hud))
     pad = max(0, (terminal_columns - vis_len) // 2)
-    return " " * pad + hud
+    return " " * pad + hud + "\033[K"
