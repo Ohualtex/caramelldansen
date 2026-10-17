@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "caramell-dansen"
+name = "caramelldansen"
 version = "0.0.1"
 authors = [
     { name = "Ohualtex" }
@@ -14,26 +14,33 @@ requires-python = ">=3.9"
 license = "MIT"
 keywords = ["caramelldansen", "terminal", "ascii-art", "truecolor", "braille", "cli"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Video :: Display",
+    "Topic :: Terminals",
 ]
 dependencies = [
     "numpy>=1.20",
+    "pygame>=2.5.0",
+    "colorama>=0.4.6",
 ]
 
 [project.urls]
 Homepage = "https://github.com/Ohualtex/caramelldansen"
-Repository = "https://github.com/Ohualtex/caramelldansen"
+Repository = "https://github.com/Ohualtex/caramelldansen.git"
 "Bug Tracker" = "https://github.com/Ohualtex/caramelldansen/issues"
 
 [project.scripts]
-caramell-dansen = "main:main"
 caramelldansen = "main:main"
 
 [tool.setuptools]
 py-modules = ["main", "renderer", "cache", "ui", "download"]
-packages = ["audio", "input"]
+packages = ["platforms", "platforms.windows", "platforms.macos", "platforms.linux"]
