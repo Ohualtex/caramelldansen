@@ -5,6 +5,7 @@ Handles alternate screen buffer, cursor states, and POSIX SIGWINCH resize signal
 
 from __future__ import annotations
 
+import os
 import shutil
 import signal
 import sys
@@ -48,7 +49,25 @@ class MacOSTerminalManager(BaseTerminalManager):
             self._in_fullscreen = False
 
     def get_size(self) -> tuple[int, int]:
-        """Returns terminal dimensions (columns, rows)."""
+        """Returns live terminal dimensions (columns, rows) querying kernel ioctl directly."""
+        for stream in (sys.stdout, sys.stdin, sys.stderr):
+            try:
+                if hasattr(stream, "fileno"):
+                    size = os.get_terminal_size(stream.fileno())
+                    if size.columns > 0 and size.lines > 0:
+                        return (size.columns, size.lines)
+            except (AttributeError, ValueError, OSError):
+                continue
+        try:
+            fd = os.open("/dev/tty", os.O_RDONLY)
+            try:
+                size = os.get_terminal_size(fd)
+                if size.columns > 0 and size.lines > 0:
+                    return (size.columns, size.lines)
+            finally:
+                os.close(fd)
+        except Exception:
+            pass
         sz = shutil.get_terminal_size(fallback=(80, 24))
         return (sz.columns, sz.lines)
 

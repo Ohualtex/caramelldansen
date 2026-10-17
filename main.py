@@ -97,7 +97,9 @@ class CaramellPlayer:
                     break
 
                 # 2. Check responsive window resizing
-                self.platform.terminal.check_resized()
+                if self.platform.terminal.check_resized():
+                    sys.stdout.write("\033[2J\033[H")
+                    sys.stdout.flush()
 
                 # 3. Audio Master Clock: Timing and Dansen Loop boundary checks
                 current_time = self.platform.audio.get_pos()
