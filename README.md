@@ -5,6 +5,8 @@
 
 High-performance, flicker-free, 24-bit TrueColor **Caramelldansen** terminal player featuring **Dansen Loop** mode!
 
+Works out of the box across **macOS, Windows, and Linux** using an isolated Platform Abstraction Layer (PAL).
+
 ---
 
 ## Features
@@ -17,10 +19,12 @@ High-performance, flicker-free, 24-bit TrueColor **Caramelldansen** terminal pla
 - **Dansen Loop Mode (Infinite Loop):**
   - Starts directly in the iconic Mai & Mii chorus dance sequence and loops seamlessly without stutter or glitches.
   - Toggle between the dance loop and the full music video using the `L` key or CLI flags.
+- **Audio Master Clock Engine:**
+  - Video rendering is strictly synchronized to audio playback hardware time for flawless rhythm alignment and zero audio-video drift.
 - **Zero-CPU Binary Cache Engine (CDBP v1):**
   - Streams from a pre-rendered, zlib-compressed RGB binary container (`caramell_dansen.bin`) for <1% CPU consumption and instantaneous seek times.
 - **Flicker-Free Terminal Experience:**
-  - Uses Alternate Screen Buffer (`\033[?1049h`), cursor hiding, and non-blocking I/O.
+  - Uses Alternate Screen Buffer (`\033[?1049h`), cursor hiding, Win32 VT100 processing, and non-blocking I/O.
 - **Responsive Sizing & Interactive Scrubber:**
   - Automatically respects 16:9 aspect ratio, centers video in any terminal window, and renders a live HUD status bar.
 
@@ -41,16 +45,25 @@ High-performance, flicker-free, 24-bit TrueColor **Caramelldansen** terminal pla
 
 ---
 
-## Quick Start
+## Installation & Quick Start
+
+### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install caramelldansen
+
+# Run directly from any terminal
+caramelldansen
+```
+
+### Option 2: Run from Source
 
 ```bash
 # Clone the repository
 git clone https://github.com/Ohualtex/caramelldansen.git
 cd caramelldansen
 
-# Run with virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+# Install dependencies
 pip install -r requirements.txt
 
 # Start playback (starts directly in Dansen Loop mode)
@@ -68,7 +81,7 @@ python3 main.py --mode color-ascii
 ## CLI Options
 
 ```text
-usage: main.py [-h] [--mode {halfblock,color-ascii,braille,ascii}] [--no-color] [--loop] [--full] [--no-audio] [--build-cache]
+usage: caramelldansen [-h] [--mode {halfblock,color-ascii,braille,ascii}] [--no-color] [--loop] [--full] [--no-audio] [--build-cache]
 
 options:
   -h, --help            show this help message and exit
