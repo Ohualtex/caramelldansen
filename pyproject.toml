@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caramelldansen"
-version = "0.0.1"
+version = "1.0.0"
 authors = [
     { name = "Ohualtex" }
 ]
@@ -14,7 +14,7 @@ requires-python = ">=3.9"
 license = "MIT"
 keywords = ["caramelldansen", "terminal", "ascii-art", "truecolor", "braille", "cli"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
