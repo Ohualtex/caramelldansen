@@ -9,6 +9,7 @@ and loop-point markers.
 from __future__ import annotations
 
 import os
+import shutil
 import struct
 import subprocess
 import time
@@ -61,30 +62,6 @@ class BinaryCacheBuilder:
         if not os.path.exists(video_path):
             raise BinaryCacheError(f"Source video not found at '{video_path}'.")
 
-        # Get video duration using ffprobe
-        probe_cmd = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            video_path,
-        ]
-        try:
-            dur_str = subprocess.check_output(probe_cmd, text=True).strip()
-            duration = float(dur_str)
-        except Exception as e:
-            raise BinaryCacheError(f"Failed to probe video duration: {e}")
-
-        total_frames = int(duration * fps)
-        if total_frames <= 0:
-            raise BinaryCacheError("Invalid video duration or empty stream.")
-
-        loop_start_frame = int(loop_start_sec * fps)
-        loop_end_frame = int(loop_end_sec * fps)
-
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         temp_output = output_path + ".tmp"
         if os.path.exists(temp_output):
@@ -93,93 +70,192 @@ class BinaryCacheBuilder:
             except OSError:
                 pass
 
-        frame_bytes_len = target_width * target_height * 3
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-i",
-            video_path,
-            "-vf",
-            f"scale={target_width}:{target_height}",
-            "-r",
-            str(fps),
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-",
-        ]
+        has_ffmpeg = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
 
-        proc = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            bufsize=frame_bytes_len * 4,
-        )
+        if has_ffmpeg:
+            # Get video duration using ffprobe
+            probe_cmd = [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                video_path,
+            ]
+            try:
+                dur_str = subprocess.check_output(probe_cmd, text=True).strip()
+                duration = float(dur_str)
+            except Exception as e:
+                raise BinaryCacheError(f"Failed to probe video duration: {e}")
 
-        index_entries: list[tuple[int, int]] = []
-        start_time = time.perf_counter()
+            total_frames = int(duration * fps)
+            loop_start_frame = int(loop_start_sec * fps)
+            loop_end_frame = int(loop_end_sec * fps)
 
-        try:
-            with open(temp_output, "wb") as f:
-                # 1. Placeholder header (32 bytes)
-                f.write(b"\x00" * HEADER_STRUCT.size)
+            frame_bytes_len = target_width * target_height * 3
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                video_path,
+                "-vf",
+                f"scale={target_width}:{target_height}",
+                "-r",
+                str(fps),
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "-",
+            ]
 
-                # 2. Frames will be written directly, indices tracked in memory
-                current_frame = 0
-                while True:
-                    raw_frame = proc.stdout.read(frame_bytes_len)
-                    if not raw_frame or len(raw_frame) < frame_bytes_len:
-                        break
+            proc = subprocess.Popen(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=frame_bytes_len * 4,
+            )
 
-                    compressed = zlib.compress(raw_frame, level=6)
-                    offset = f.tell()
-                    comp_size = len(compressed)
+            index_entries: list[tuple[int, int]] = []
+            start_time = time.perf_counter()
 
-                    if comp_size > 65535:
-                        raise BinaryCacheError(
-                            f"Compressed frame {current_frame} exceeded uint16 max size ({comp_size} bytes)."
+            try:
+                with open(temp_output, "wb") as f:
+                    f.write(b"\x00" * HEADER_STRUCT.size)
+                    current_frame = 0
+                    while True:
+                        raw_frame = proc.stdout.read(frame_bytes_len)
+                        if not raw_frame or len(raw_frame) < frame_bytes_len:
+                            break
+
+                        compressed = zlib.compress(raw_frame, level=6)
+                        offset = f.tell()
+                        comp_size = len(compressed)
+
+                        if comp_size > 65535:
+                            raise BinaryCacheError(
+                                f"Compressed frame {current_frame} exceeded uint16 max size ({comp_size} bytes)."
+                            )
+
+                        f.write(compressed)
+                        index_entries.append((offset, comp_size))
+                        current_frame += 1
+
+                        if progress_callback and (current_frame % 25 == 0 or current_frame == total_frames):
+                            elapsed = time.perf_counter() - start_time
+                            progress_callback(current_frame, total_frames, elapsed)
+
+                    actual_total_frames = len(index_entries)
+                    if actual_total_frames == 0:
+                        raise BinaryCacheError("No frames were extracted from the video stream.")
+
+                    index_table_offset = f.tell()
+                    for offset, comp_size in index_entries:
+                        f.write(INDEX_ENTRY_STRUCT.pack(offset, comp_size))
+
+                    f.seek(0)
+                    f.write(
+                        HEADER_STRUCT.pack(
+                            CDBP_MAGIC,
+                            CDBP_VERSION,
+                            target_width,
+                            target_height,
+                            fps,
+                            actual_total_frames,
+                            COLOR_FORMAT_RGB24,
+                            loop_start_frame,
+                            loop_end_frame,
+                            b"\x00" * 3,
                         )
-
-                    f.write(compressed)
-                    index_entries.append((offset, comp_size))
-                    current_frame += 1
-
-                    if progress_callback and (current_frame % 25 == 0 or current_frame == total_frames):
-                        elapsed = time.perf_counter() - start_time
-                        progress_callback(current_frame, total_frames, elapsed)
-
-                actual_total_frames = len(index_entries)
-                if actual_total_frames == 0:
-                    raise BinaryCacheError("No frames were extracted from the video stream.")
-
-                # 3. Write index table at end of file
-                index_table_offset = f.tell()
-                for offset, comp_size in index_entries:
-                    f.write(INDEX_ENTRY_STRUCT.pack(offset, comp_size))
-
-                # 4. Seek back and write final header
-                f.seek(0)
-                f.write(
-                    HEADER_STRUCT.pack(
-                        CDBP_MAGIC,
-                        CDBP_VERSION,
-                        target_width,
-                        target_height,
-                        fps,
-                        actual_total_frames,
-                        COLOR_FORMAT_RGB24,
-                        loop_start_frame,
-                        loop_end_frame,
-                        b"\x00" * 3,
                     )
+            finally:
+                if proc.poll() is None:
+                    proc.terminate()
+                    proc.wait()
+
+        else:
+            # Fallback to OpenCV (cv2)
+            try:
+                import cv2
+            except ImportError:
+                raise BinaryCacheError(
+                    "Neither ffmpeg/ffprobe CLI tools nor opencv-python (cv2) is available to process video."
                 )
 
-        finally:
-            if proc.poll() is None:
-                proc.terminate()
-                proc.wait()
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise BinaryCacheError(f"OpenCV failed to open video file at '{video_path}'.")
+
+            src_fps = cap.get(cv2.CAP_PROP_FPS) or fps
+            src_frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            duration = src_frame_count / max(1.0, src_fps)
+            total_frames = int(duration * fps)
+
+            loop_start_frame = int(loop_start_sec * fps)
+            loop_end_frame = int(loop_end_sec * fps)
+
+            index_entries = []
+            start_time = time.perf_counter()
+
+            try:
+                with open(temp_output, "wb") as f:
+                    f.write(b"\x00" * HEADER_STRUCT.size)
+                    current_frame = 0
+
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret or frame is None:
+                            break
+
+                        resized = cv2.resize(frame, (target_width, target_height), interpolation=cv2.INTER_AREA)
+                        rgb_frame = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+                        raw_bytes = rgb_frame.tobytes()
+
+                        compressed = zlib.compress(raw_bytes, level=6)
+                        offset = f.tell()
+                        comp_size = len(compressed)
+
+                        if comp_size > 65535:
+                            raise BinaryCacheError(
+                                f"Compressed frame {current_frame} exceeded uint16 max size ({comp_size} bytes)."
+                            )
+
+                        f.write(compressed)
+                        index_entries.append((offset, comp_size))
+                        current_frame += 1
+
+                        if progress_callback and (current_frame % 25 == 0 or current_frame == total_frames):
+                            elapsed = time.perf_counter() - start_time
+                            progress_callback(current_frame, total_frames, elapsed)
+
+                    actual_total_frames = len(index_entries)
+                    if actual_total_frames == 0:
+                        raise BinaryCacheError("No frames were extracted from OpenCV stream.")
+
+                    index_table_offset = f.tell()
+                    for offset, comp_size in index_entries:
+                        f.write(INDEX_ENTRY_STRUCT.pack(offset, comp_size))
+
+                    f.seek(0)
+                    f.write(
+                        HEADER_STRUCT.pack(
+                            CDBP_MAGIC,
+                            CDBP_VERSION,
+                            target_width,
+                            target_height,
+                            fps,
+                            actual_total_frames,
+                            COLOR_FORMAT_RGB24,
+                            loop_start_frame,
+                            loop_end_frame,
+                            b"\x00" * 3,
+                        )
+                    )
+            finally:
+                cap.release()
 
         # Atomic rename
         if os.path.exists(output_path):
