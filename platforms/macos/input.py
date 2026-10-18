@@ -74,8 +74,6 @@ class MacOSInputHandler(BaseInputHandler):
                 return "QUIT"
             elif ch in (b"m", b"M"):
                 return "MODE"
-            elif ch in (b"c", b"C"):
-                return "COLOR"
             elif ch in (b"r", b"R"):
                 return "RESTART"
 

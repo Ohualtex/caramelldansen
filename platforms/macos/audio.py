@@ -1,7 +1,7 @@
 """
 macOS audio player subsystem.
 Prioritizes hardware-accelerated Pygame with CoreAudio pop mitigation,
-falling back to built-in afplay command.
+falling back to ffplay or built-in afplay command.
 """
 
 from __future__ import annotations
