@@ -1,6 +1,6 @@
 """
 High-performance color and Unicode terminal rendering engine for Caramell Dansen.
-Supports TrueColor (24-bit) halfblock, color-ASCII, Braille 2x4 matrix, and classic monochrome.
+Supports TrueColor (24-bit) halfblock, color-ASCII, and Braille 2x4 dot matrix.
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ def get_terminal_size(fallback: Tuple[int, int] = (80, 24)) -> Tuple[int, int]:
     Bypasses static os.environ['COLUMNS'] / ['LINES'] caches by querying
     file descriptors directly via kernel ioctl.
     """
-    import sys
     for stream in (sys.stdout, sys.stdin, sys.stderr):
         try:
             if hasattr(stream, "fileno"):
@@ -58,7 +57,7 @@ class TerminalRenderer:
     Optimized for zero-flicker and minimal I/O overhead.
     """
 
-    MODES = ["halfblock", "color-ascii", "braille", "ascii"]
+    MODES = ["halfblock", "color-ascii", "braille"]
 
     def __init__(
         self,
@@ -66,13 +65,11 @@ class TerminalRenderer:
         aspect_ratio: float = 16.0 / 9.0,
         target_width: Optional[int] = None,
         target_height: Optional[int] = None,
-        color: bool = True,
     ):
         self.mode = mode if mode in self.MODES else "halfblock"
         self.aspect_ratio = aspect_ratio
         self.target_width = target_width
         self.target_height = target_height
-        self.color = color
 
         # Cached grid mapping
         self._grid_key = None
@@ -150,7 +147,7 @@ class TerminalRenderer:
             pix_h = char_h * 4
 
         else:
-            # ascii / color-ascii
+            # color-ascii
             # 1 character cell = 1 pixel.
             # Because cell is 1:2, char_h = char_w / (ar * 2)
             h_by_w = int(round(avail_w / (ar * 2.0)))
@@ -211,7 +208,7 @@ class TerminalRenderer:
         elif self.mode == "braille":
             lines.extend(self._render_braille(scaled, char_w, char_h, left_margin))
         else:
-            lines.extend(self._render_ascii(scaled, char_w, char_h, left_margin))
+            lines.extend(self._render_halfblock(scaled, char_w, char_h, left_margin))
 
         return "".join(lines)
 
@@ -225,19 +222,6 @@ class TerminalRenderer:
         output: list[str] = []
         top_pixels = frame[0::2, :, :]
         bot_pixels = frame[1::2, :, :]
-
-        if not self.color:
-            # Monochrome thresholding
-            lum_top = (top_pixels[..., 0] * 0.299 + top_pixels[..., 1] * 0.587 + top_pixels[..., 2] * 0.114) > 128
-            lum_bot = (bot_pixels[..., 0] * 0.299 + bot_pixels[..., 1] * 0.587 + bot_pixels[..., 2] * 0.114) > 128
-            lut = np.array([" ", "▄", "▀", "█"], dtype="<U1")
-            code = (lum_top.astype(np.int32) * 2) + lum_bot.astype(np.int32)
-            chars = lut[code]
-            for row in chars:
-                output.append(margin)
-                output.append("".join(row))
-                output.append("\033[K\n")
-            return output
 
         # TrueColor Halfblock with ANSI run-length compression
         for y in range(char_h):
@@ -291,25 +275,10 @@ class TerminalRenderer:
 
         return output
 
-    def _render_ascii(
-        self, frame: np.ndarray, char_w: int, char_h: int, margin: str
-    ) -> list[str]:
-        """Monochrome ASCII render."""
-        lum = (frame[..., 0] * 0.299 + frame[..., 1] * 0.587 + frame[..., 2] * 0.114).astype(np.float32)
-        indices = (lum * ((len(ASCII_CHARS) - 1) / 255.0)).astype(np.int32)
-        chars = ASCII_CHARS[indices]
-
-        output: list[str] = []
-        for row in chars:
-            output.append(margin)
-            output.append("".join(row))
-            output.append("\033[K\n")
-        return output
-
     def _render_braille(
         self, frame: np.ndarray, char_w: int, char_h: int, margin: str
     ) -> list[str]:
-        """Renders 2x4 dot Unicode Braille matrix."""
+        """Renders 2x4 dot Unicode Braille matrix with TrueColor RGB."""
         lum = (frame[..., 0] * 0.299 + frame[..., 1] * 0.587 + frame[..., 2] * 0.114) > 120
         output: list[str] = []
 
@@ -343,17 +312,14 @@ class TerminalRenderer:
 
                 ch = chr(BRAILLE_BASE + code)
 
-                if self.color:
-                    cell_rgb = frame[py : py + 4, px : px + 2].mean(axis=(0, 1)).astype(np.int32)
-                    r, g, b = int(cell_rgb[0]), int(cell_rgb[1]), int(cell_rgb[2])
-                    if (r, g, b) != last_fg:
-                        output.append(f"\033[38;2;{r};{g};{b}m")
-                        last_fg = (r, g, b)
+                cell_rgb = frame[py : py + 4, px : px + 2].mean(axis=(0, 1)).astype(np.int32)
+                r, g, b = int(cell_rgb[0]), int(cell_rgb[1]), int(cell_rgb[2])
+                if (r, g, b) != last_fg:
+                    output.append(f"\033[38;2;{r};{g};{b}m")
+                    last_fg = (r, g, b)
 
                 output.append(ch)
 
-            if self.color:
-                output.append("\033[0m")
-            output.append("\033[K\n")
+            output.append("\033[0m\033[K\n")
 
         return output
