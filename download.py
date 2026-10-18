@@ -18,18 +18,21 @@ DEFAULT_AUDIO_NAME = "caramell_dansen.mp3"
 DEFAULT_CACHE_NAME = "caramell_dansen.bin"
 
 CACHE_URLS = [
+    "https://github.com/Ohualtex/caramelldansen/releases/download/v1.1.0/caramell_dansen.bin",
     "https://github.com/Ohualtex/caramelldansen/releases/download/v1.0.0/caramell_dansen.bin",
     "https://github.com/Ohualtex/caramelldansen/releases/download/v0.0.1/caramell_dansen.bin",
 ]
 CACHE_MD5 = "8433fce43d9f43b77d7cb67ed7f750e5"
 
 AUDIO_URLS = [
+    "https://github.com/Ohualtex/caramelldansen/releases/download/v1.1.0/caramell_dansen.mp3",
     "https://github.com/Ohualtex/caramelldansen/releases/download/v1.0.0/caramell_dansen.mp3",
     "https://github.com/Ohualtex/caramelldansen/releases/download/v0.0.1/caramell_dansen.mp3",
 ]
 AUDIO_MD5 = "bdc346654f84cfe98bba911bf1561851"
 
 VIDEO_URLS = [
+    "https://github.com/Ohualtex/caramelldansen/releases/download/v1.1.0/caramell_dansen.mp4",
     "https://github.com/Ohualtex/caramelldansen/releases/download/v1.0.0/caramell_dansen.mp4",
     "https://github.com/Ohualtex/caramelldansen/releases/download/v0.0.1/caramell_dansen.mp4",
 ]
