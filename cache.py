@@ -145,7 +145,6 @@ class BinaryCacheBuilder:
                     if actual_total_frames == 0:
                         raise BinaryCacheError("No frames were extracted from the video stream.")
 
-                    index_table_offset = f.tell()
                     for offset, comp_size in index_entries:
                         f.write(INDEX_ENTRY_STRUCT.pack(offset, comp_size))
 
@@ -223,7 +222,6 @@ class BinaryCacheBuilder:
                     if actual_total_frames == 0:
                         raise BinaryCacheError("No frames were extracted from OpenCV stream.")
 
-                    index_table_offset = f.tell()
                     for offset, comp_size in index_entries:
                         f.write(INDEX_ENTRY_STRUCT.pack(offset, comp_size))
 
