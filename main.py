@@ -24,13 +24,11 @@ class CaramellPlayer:
     def __init__(
         self,
         mode: str = "halfblock",
-        color: bool = True,
         no_audio: bool = False,
         cache_path: str | None = None,
         audio_path: str | None = None,
     ):
         self.mode = mode
-        self.color = color
         self.no_audio = no_audio
         self.cache_path = cache_path
         self.audio_path = audio_path
@@ -59,7 +57,6 @@ class CaramellPlayer:
         self.renderer = TerminalRenderer(
             mode=self.mode,
             aspect_ratio=16.0 / 9.0,
-            color=self.color,
         )
 
     def run(self) -> None:
@@ -102,7 +99,7 @@ class CaramellPlayer:
                     break
 
                 # 4. Fetch synchronized video frame
-                frame_rgb, frame_idx = self.cache.get_frame_for_time(current_time)
+                frame_rgb, _ = self.cache.get_frame_for_time(current_time)
 
                 # 5. Get terminal dimensions and render video frame
                 cols, lines = self.platform.terminal.get_size()
@@ -118,7 +115,6 @@ class CaramellPlayer:
                     duration=self.cache.duration,
                     fps=measured_fps,
                     mode=self.renderer.mode,
-                    color=self.renderer.color,
                     is_paused=self.is_paused,
                     terminal_columns=cols,
                 )
@@ -166,10 +162,6 @@ class CaramellPlayer:
             new_mode = self.renderer.cycle_mode()
             self.mode = new_mode
 
-        elif key == "COLOR":
-            self.color = not self.color
-            self.renderer.color = self.color
-
         elif key == "RIGHT":
             new_pos = min(self.cache.duration, self.platform.audio.get_pos() + 5.0)
             self.platform.audio.seek(new_pos)
@@ -204,16 +196,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--mode",
-        choices=["halfblock", "color-ascii", "braille", "ascii"],
+        choices=["halfblock", "color-ascii", "braille"],
         default="halfblock",
         help="Rendering mode",
-    )
-    parser.add_argument(
-        "--no-color",
-        "--mono",
-        dest="color",
-        action="store_false",
-        help="Disable TrueColor rendering and run in monochrome",
     )
     parser.add_argument(
         "--no-audio",
@@ -244,7 +229,6 @@ def main() -> None:
 
     player = CaramellPlayer(
         mode=args.mode,
-        color=args.color,
         no_audio=args.no_audio,
     )
 
