@@ -16,8 +16,7 @@ Built with a modular **Platform Abstraction Layer (PAL)** and **Audio Master Clo
 - **24-bit TrueColor Rendering:**
   - `halfblock` (Default): Uses half-block characters (`▀`, `▄`) with 24-bit TrueColor for near-square pixels and stunning visual fidelity.
   - `color-ascii`: Classic ASCII character brightness ramp combined with full RGB color.
-  - `braille`: High-resolution Unicode Braille (2x4 dot matrix) rendering.
-  - `ascii`: Nostalgic monochrome ASCII shading.
+  - `braille`: High-resolution Unicode Braille (2x4 dot matrix) with 24-bit TrueColor rendering.
 - **Audio Master Clock Engine:**
   - Video rendering is strictly synchronized to hardware audio playback time for flawless rhythm alignment and zero audio-video drift.
 - **Zero-CPU Binary Cache Engine (CDBP v1):**
@@ -36,8 +35,7 @@ Built with a modular **Platform Abstraction Layer (PAL)** and **Audio Master Clo
 | Key | Action |
 | :--- | :--- |
 | **Space** | Pause / Resume |
-| **M** | Cycle Render Mode (`halfblock` → `color-ascii` → `braille` → `ascii`) |
-| **C** | Toggle Color Mode (TrueColor RGB ↔ Monochrome) |
+| **M** | Cycle Render Mode (`halfblock` → `color-ascii` → `braille`) |
 | **Right Arrow ($\rightarrow$)** | Seek forward 5 seconds |
 | **Left Arrow ($\leftarrow$)** | Seek backward 5 seconds |
 | **R** | Restart playback from beginning |
@@ -80,13 +78,12 @@ python main.py --mode color-ascii
 ## CLI Options
 
 ```text
-usage: caramelldansen [-h] [--mode {halfblock,color-ascii,braille,ascii}] [--no-color] [--no-audio] [--build-cache]
+usage: caramelldansen [-h] [--mode {halfblock,color-ascii,braille}] [--no-audio] [--build-cache]
 
 options:
   -h, --help            show this help message and exit
-  --mode {halfblock,color-ascii,braille,ascii}
+  --mode {halfblock,color-ascii,braille}
                         Rendering mode (default: halfblock)
-  --no-color, --mono    Disable TrueColor rendering and run in monochrome
   --no-audio            Mute audio and run on internal clock
   --build-cache         Force rebuild CDBP binary cache
 ```
