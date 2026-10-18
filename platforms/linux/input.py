@@ -75,8 +75,6 @@ class LinuxInputHandler(BaseInputHandler):
                 return "MODE"
             elif ch in (b"c", b"C"):
                 return "COLOR"
-            elif ch in (b"l", b"L"):
-                return "LOOP"
             elif ch in (b"r", b"R"):
                 return "RESTART"
 

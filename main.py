@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Caramell Dansen Terminal Player
-High-performance, TrueColor and Unicode terminal player with Dansen Loop mode.
+High-performance, TrueColor and Unicode terminal player.
 Built with Platform Abstraction Layer (PAL) and Audio Master Clock architecture.
 """
 
@@ -25,14 +25,12 @@ class CaramellPlayer:
         self,
         mode: str = "halfblock",
         color: bool = True,
-        loop: bool = False,
         no_audio: bool = False,
         cache_path: str | None = None,
         audio_path: str | None = None,
     ):
         self.mode = mode
         self.color = color
-        self.loop = loop
         self.no_audio = no_audio
         self.cache_path = cache_path
         self.audio_path = audio_path
@@ -73,12 +71,7 @@ class CaramellPlayer:
         self.platform.terminal.enter_fullscreen()
         self.running = True
 
-        # If starting directly in Dansen Loop mode, seek audio to chorus start
-        if self.loop:
-            self.platform.audio.start()
-            self.platform.audio.seek(self.cache.loop_start_sec)
-        else:
-            self.platform.audio.start()
+        self.platform.audio.start()
 
         fps_timer = time.perf_counter()
         frame_counter = 0
@@ -101,18 +94,10 @@ class CaramellPlayer:
                     sys.stdout.write("\033[2J\033[H")
                     sys.stdout.flush()
 
-                # 3. Audio Master Clock: Timing and Dansen Loop boundary checks
+                # 3. Audio Master Clock: Timing and boundary checks
                 current_time = self.platform.audio.get_pos()
-
-                if self.loop:
-                    if current_time >= self.cache.loop_end_sec:
-                        self.platform.audio.seek(self.cache.loop_start_sec)
-                        current_time = self.cache.loop_start_sec
-                    elif current_time < self.cache.loop_start_sec:
-                        self.platform.audio.seek(self.cache.loop_start_sec)
-                        current_time = self.cache.loop_start_sec
-                elif current_time >= self.cache.duration:
-                    # Video playback finished in full video mode
+                if current_time >= self.cache.duration:
+                    # Video playback finished
                     self.running = False
                     break
 
@@ -134,7 +119,6 @@ class CaramellPlayer:
                     fps=measured_fps,
                     mode=self.renderer.mode,
                     color=self.renderer.color,
-                    loop_active=self.loop,
                     is_paused=self.is_paused,
                     terminal_columns=cols,
                 )
@@ -186,13 +170,6 @@ class CaramellPlayer:
             self.color = not self.color
             self.renderer.color = self.color
 
-        elif key == "LOOP":
-            self.loop = not self.loop
-            if self.loop:
-                curr = self.platform.audio.get_pos()
-                if curr < self.cache.loop_start_sec or curr >= self.cache.loop_end_sec:
-                    self.platform.audio.seek(self.cache.loop_start_sec)
-
         elif key == "RIGHT":
             new_pos = min(self.cache.duration, self.platform.audio.get_pos() + 5.0)
             self.platform.audio.seek(new_pos)
@@ -202,8 +179,7 @@ class CaramellPlayer:
             self.platform.audio.seek(new_pos)
 
         elif key == "RESTART":
-            target = self.cache.loop_start_sec if self.loop else 0.0
-            self.platform.audio.seek(target)
+            self.platform.audio.seek(0.0)
 
     def cleanup(self) -> None:
         """Restores all system and terminal state."""
@@ -240,19 +216,6 @@ def main() -> None:
         help="Disable TrueColor rendering and run in monochrome",
     )
     parser.add_argument(
-        "--loop",
-        dest="loop",
-        action="store_true",
-        default=False,
-        help="Start in infinite Dansen Loop mode",
-    )
-    parser.add_argument(
-        "--full",
-        dest="loop",
-        action="store_false",
-        help="Play full music video from start to finish (default)",
-    )
-    parser.add_argument(
         "--no-audio",
         action="store_true",
         help="Mute audio and run on internal clock",
@@ -282,7 +245,6 @@ def main() -> None:
     player = CaramellPlayer(
         mode=args.mode,
         color=args.color,
-        loop=args.loop,
         no_audio=args.no_audio,
     )
 

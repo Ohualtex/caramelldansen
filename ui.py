@@ -43,13 +43,12 @@ def render_status_bar(
     fps: float,
     mode: str,
     color: bool,
-    loop_active: bool,
     is_paused: bool,
     terminal_columns: int,
 ) -> str:
     """
     Renders an adaptive, centered status HUD bar.
-    Displays playback state, scrubber, loop mode, render mode, and FPS.
+    Displays playback state, scrubber, render mode, and FPS.
     Gracefully condenses layout on narrow terminals to prevent line wrapping.
     """
     time_str = f"{format_time(current_time)} / {format_time(duration)}"
@@ -68,12 +67,11 @@ def render_status_bar(
     else:
         # Full rich HUD
         progress_bar = create_progress_bar(current_time, duration, bar_length=16)
-        loop_badge = "\033[95m[LOOP ON]\033[0m" if loop_active else "\033[90m[LOOP OFF]\033[0m"
         color_badge = "\033[96m[RGB]\033[0m" if color else "\033[90m[MONO]\033[0m"
         mode_badge = f"\033[97m{mode}\033[0m"
         hud = (
             f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  "
-            f"│  {mode_badge}  {color_badge}  {loop_badge}  │  {fps_badge} "
+            f"│  {mode_badge}  {color_badge}  │  {fps_badge} "
         )
 
     vis_len = len(strip_ansi(hud))

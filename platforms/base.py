@@ -59,7 +59,7 @@ class BaseInputHandler(ABC):
     def poll_key(self) -> str | None:
         """
         Polls for a key press without blocking.
-        Returns semantic key tokens ('SPACE', 'QUIT', 'MODE', 'COLOR', 'LOOP',
+        Returns semantic key tokens ('SPACE', 'QUIT', 'MODE', 'COLOR',
         'RESTART', 'RIGHT', 'LEFT', 'UP', 'DOWN') or None.
         """
         pass

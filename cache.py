@@ -2,8 +2,7 @@
 CDBP (Caramell Dansen Binary Pre-rendered) cache engine.
 
 Provides zero-CPU, instant random-access playback of color Caramelldansen frames
-by storing RGB video frames compressed with zlib alongside an indexed lookup table
-and loop-point markers.
+by storing RGB video frames compressed with zlib alongside an indexed lookup table.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ import zlib
 from typing import Callable, Optional, Tuple
 import numpy as np
 
-# Header specification (Total: 32 bytes)
+# Header specification (Total: 30 bytes)
 # <4s : Magic bytes (b"CDBP")
 # H   : Version (uint16 = 1)
 # H   : Width (uint16)
@@ -25,14 +24,12 @@ import numpy as np
 # f   : FPS (float32)
 # I   : Total frames (uint32)
 # B   : Color format (1 = RGB24 zlib)
-# I   : Loop start frame (uint32)
-# I   : Loop end frame (uint32)
-# 3s  : Reserved padding
+# 11s : Reserved padding
 CDBP_MAGIC = b"CDBP"
 CDBP_VERSION = 1
 COLOR_FORMAT_RGB24 = 1
 
-HEADER_STRUCT = struct.Struct("<4sHHHfIBII3s")
+HEADER_STRUCT = struct.Struct("<4sHHHfIB11s")
 INDEX_ENTRY_STRUCT = struct.Struct("<IH")  # offset (uint32), compressed_size (uint16)
 
 
@@ -51,8 +48,6 @@ class BinaryCacheBuilder:
         target_width: int = 160,
         target_height: int = 90,
         fps: float = 25.0,
-        loop_start_sec: float = 30.5,
-        loop_end_sec: float = 59.5,
         progress_callback: Optional[Callable[[int, int, float], None]] = None,
     ) -> None:
         """
@@ -91,8 +86,6 @@ class BinaryCacheBuilder:
                 raise BinaryCacheError(f"Failed to probe video duration: {e}")
 
             total_frames = int(duration * fps)
-            loop_start_frame = int(loop_start_sec * fps)
-            loop_end_frame = int(loop_end_sec * fps)
 
             frame_bytes_len = target_width * target_height * 3
             ffmpeg_cmd = [
@@ -166,9 +159,7 @@ class BinaryCacheBuilder:
                             fps,
                             actual_total_frames,
                             COLOR_FORMAT_RGB24,
-                            loop_start_frame,
-                            loop_end_frame,
-                            b"\x00" * 3,
+                            b"\x00" * 11,
                         )
                     )
             finally:
@@ -193,9 +184,6 @@ class BinaryCacheBuilder:
             src_frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
             duration = src_frame_count / max(1.0, src_fps)
             total_frames = int(duration * fps)
-
-            loop_start_frame = int(loop_start_sec * fps)
-            loop_end_frame = int(loop_end_sec * fps)
 
             index_entries = []
             start_time = time.perf_counter()
@@ -249,9 +237,7 @@ class BinaryCacheBuilder:
                             fps,
                             actual_total_frames,
                             COLOR_FORMAT_RGB24,
-                            loop_start_frame,
-                            loop_end_frame,
-                            b"\x00" * 3,
+                            b"\x00" * 11,
                         )
                     )
             finally:
@@ -284,8 +270,6 @@ class BinaryCacheReader:
             self.fps,
             self.total_frames,
             self.color_format,
-            self.loop_start_frame,
-            self.loop_end_frame,
             _,
         ) = HEADER_STRUCT.unpack(header_data)
 
@@ -295,8 +279,6 @@ class BinaryCacheReader:
             raise BinaryCacheError(f"Unsupported CDBP version {version}.")
 
         self.duration = float(self.total_frames) / float(self.fps) if self.fps > 0 else 0.0
-        self.loop_start_sec = float(self.loop_start_frame) / float(self.fps) if self.fps > 0 else 0.0
-        self.loop_end_sec = float(self.loop_end_frame) / float(self.fps) if self.fps > 0 else self.duration
 
         # Read index table
         index_table_size = self.total_frames * INDEX_ENTRY_STRUCT.size

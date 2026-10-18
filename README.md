@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/Ohualtex/caramelldansen)
 
-High-performance, flicker-free, 24-bit TrueColor **Caramelldansen** terminal player featuring **Dansen Loop** mode!
+High-performance, flicker-free, 24-bit TrueColor **Caramelldansen** terminal player!
 
 Built with a modular **Platform Abstraction Layer (PAL)** and **Audio Master Clock** architecture, providing zero-configuration, cross-platform audio and rendering on **macOS, Windows, and Linux**.
 
@@ -18,9 +18,6 @@ Built with a modular **Platform Abstraction Layer (PAL)** and **Audio Master Clo
   - `color-ascii`: Classic ASCII character brightness ramp combined with full RGB color.
   - `braille`: High-resolution Unicode Braille (2x4 dot matrix) rendering.
   - `ascii`: Nostalgic monochrome ASCII shading.
-- **Dansen Loop Mode (Infinite Loop):**
-  - Starts directly in the iconic Mai & Mii chorus dance sequence and loops seamlessly without stutter or glitches.
-  - Toggle between the dance loop and the full music video using the `L` key or CLI flags.
 - **Audio Master Clock Engine:**
   - Video rendering is strictly synchronized to hardware audio playback time for flawless rhythm alignment and zero audio-video drift.
 - **Zero-CPU Binary Cache Engine (CDBP v1):**
@@ -41,10 +38,9 @@ Built with a modular **Platform Abstraction Layer (PAL)** and **Audio Master Clo
 | **Space** | Pause / Resume |
 | **M** | Cycle Render Mode (`halfblock` → `color-ascii` → `braille` → `ascii`) |
 | **C** | Toggle Color Mode (TrueColor RGB ↔ Monochrome) |
-| **L** | Toggle **Dansen Loop** mode |
 | **Right Arrow ($\rightarrow$)** | Seek forward 5 seconds |
 | **Left Arrow ($\leftarrow$)** | Seek backward 5 seconds |
-| **R** | Restart playback |
+| **R** | Restart playback from beginning |
 | **Q / Esc** | Quit cleanly |
 
 ---
@@ -75,9 +71,6 @@ pip install -r requirements.txt
 # Start playback (plays full music video from 00:00)
 python main.py
 
-# Start directly in infinite Dansen Loop mode
-python main.py --loop
-
 # Select rendering mode
 python main.py --mode color-ascii
 ```
@@ -87,15 +80,13 @@ python main.py --mode color-ascii
 ## CLI Options
 
 ```text
-usage: caramelldansen [-h] [--mode {halfblock,color-ascii,braille,ascii}] [--no-color] [--loop] [--full] [--no-audio] [--build-cache]
+usage: caramelldansen [-h] [--mode {halfblock,color-ascii,braille,ascii}] [--no-color] [--no-audio] [--build-cache]
 
 options:
   -h, --help            show this help message and exit
   --mode {halfblock,color-ascii,braille,ascii}
                         Rendering mode (default: halfblock)
   --no-color, --mono    Disable TrueColor rendering and run in monochrome
-  --loop                Start in infinite Dansen Loop mode
-  --full                Play full music video from start to finish (default)
   --no-audio            Mute audio and run on internal clock
   --build-cache         Force rebuild CDBP binary cache
 ```
