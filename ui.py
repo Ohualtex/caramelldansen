@@ -42,7 +42,6 @@ def render_status_bar(
     duration: float,
     fps: float,
     mode: str,
-    color: bool,
     is_paused: bool,
     terminal_columns: int,
 ) -> str:
@@ -54,24 +53,22 @@ def render_status_bar(
     time_str = f"{format_time(current_time)} / {format_time(duration)}"
     status_badge = "\033[93m⏸ PAUSED\033[0m" if is_paused else "\033[92m▶ PLAY\033[0m"
     fps_badge = f"\033[90m{fps:.1f} fps\033[0m"
+    mode_badge = f"\033[97m{mode}\033[0m"
 
     if terminal_columns < 45:
         # Ultra-compact HUD for very small windows
         hud = f" {status_badge}  \033[97m{time_str}\033[0m "
-    elif terminal_columns < 75:
-        # Compact HUD with small scrubber
-        bar_len = max(6, min(10, terminal_columns - 46))
+    elif terminal_columns < 70:
+        # Compact HUD with small scrubber and mode
+        bar_len = max(6, min(12, terminal_columns - 42))
         progress_bar = create_progress_bar(current_time, duration, bar_length=bar_len)
-        color_badge = "\033[96m[RGB]\033[0m" if color else "\033[90m[MONO]\033[0m"
-        hud = f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  │  {color_badge} "
+        hud = f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  │  {mode_badge} "
     else:
         # Full rich HUD
         progress_bar = create_progress_bar(current_time, duration, bar_length=16)
-        color_badge = "\033[96m[RGB]\033[0m" if color else "\033[90m[MONO]\033[0m"
-        mode_badge = f"\033[97m{mode}\033[0m"
         hud = (
             f" {status_badge}  {progress_bar}  \033[97m{time_str}\033[0m  "
-            f"│  {mode_badge}  {color_badge}  │  {fps_badge} "
+            f"│  {mode_badge}  │  {fps_badge} "
         )
 
     vis_len = len(strip_ansi(hud))
