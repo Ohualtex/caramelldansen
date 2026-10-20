@@ -154,7 +154,7 @@ def _download_file(url_or_urls: str | list[str], destination: str, expected_md5:
             else:
                 raise ValueError(f"{label} MD5 mismatch. File may be corrupted.")
         except KeyboardInterrupt:
-            print(f"\n[!] Download cancelled by user.")
+            print("\n[!] Download cancelled by user.")
             if os.path.exists(temp_destination):
                 try:
                     os.remove(temp_destination)

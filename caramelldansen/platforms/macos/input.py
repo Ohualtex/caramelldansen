@@ -11,7 +11,6 @@ from ..base import BaseInputHandler
 
 try:
     import termios
-    import tty
 
     _HAS_TERMIOS = True
 except ImportError:
