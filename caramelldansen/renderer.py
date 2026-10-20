@@ -130,11 +130,12 @@ class TerminalRenderer:
 
         elif self.mode == "braille":
             # Braille character has 2x4 dots (width 2, height 4).
-            # Aspect ratio correction: char_cell is 1:2.
-            # 2 dots wide, 4 dots tall matches the 1:2 cell ratio perfectly!
-            # char_h = char_w / ar
-            h_by_w = int(round(avail_w / ar))
-            w_by_h = int(round(avail_h * ar))
+            # A terminal character cell has a ~1:2 aspect ratio (height is twice width).
+            # 2 dots wide x 4 dots tall has a sub-pixel ratio of 2/4 = 1/2, matching the cell ratio.
+            # Therefore, the on-screen character grid matches halfblock and color-ascii:
+            # char_h = char_w / (ar * 2.0)
+            h_by_w = int(round(avail_w / (ar * 2.0)))
+            w_by_h = int(round(avail_h * 2.0 * ar))
 
             if h_by_w <= avail_h:
                 char_w = avail_w
