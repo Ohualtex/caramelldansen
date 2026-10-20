@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caramelldansen"
-version = "1.2.1"
+version = "1.3.0"
 authors = [
     { name = "Ohualtex" }
 ]
@@ -39,8 +39,16 @@ Repository = "https://github.com/Ohualtex/caramelldansen.git"
 "Bug Tracker" = "https://github.com/Ohualtex/caramelldansen/issues"
 
 [project.scripts]
-caramelldansen = "main:main"
+caramelldansen = "caramelldansen.main:main"
 
 [tool.setuptools]
-py-modules = ["main", "renderer", "cache", "ui", "download"]
-packages = ["platforms", "platforms.windows", "platforms.macos", "platforms.linux"]
+packages = [
+    "caramelldansen",
+    "caramelldansen.platforms",
+    "caramelldansen.platforms.windows",
+    "caramelldansen.platforms.macos",
+    "caramelldansen.platforms.linux",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"caramelldansen/main.py" = ["E402"]
