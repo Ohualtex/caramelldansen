@@ -56,6 +56,11 @@ Run directly from any terminal:
 caramelldansen
 ```
 
+Or execute as a module:
+```bash
+python -m caramelldansen
+```
+
 ### Option 2: Run from Source
 
 ```bash
